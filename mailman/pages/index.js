@@ -3,10 +3,11 @@ import Head from 'next/head'
 import Web3 from 'web3'
 import { bufferToHex } from 'ethereumjs-util'
 import { encrypt } from '@metamask/eth-sig-util'
+import { ethers } from 'ethers'
 
 import abi from '../interfaces/contract.json'
 
-const CONTRACT_ADDRESS = '0xd5F6fE836132322B4f726D2AEfCd9EEfd47C103E'
+const CONTRACT_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3'
 
 export default function Home() {
   const web3 = new Web3(Web3.givenProvider || "ws://localhost:8545");
@@ -14,6 +15,15 @@ export default function Home() {
   const [account, setAccount] = useState('')
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [encrypted, setEncrypted] = useState('')
+  const [message, setMessage] = useState('')
+
+  var provider, signer, contract;
+
+  const connectContract = () => {
+    provider = new ethers.providers.Web3Provider(window.ethereum)
+    signer = provider.getSigner()
+    contract = new ethers.Contract(CONTRACT_ADDRESS, abi.abi, signer)
+  }
 
   const checkWalletConnected = async () => {
 		try {
@@ -76,18 +86,20 @@ export default function Home() {
         params: [account],
       })
 
+    setEncrypted(encryptionPublicKey)
+
     return encryptionPublicKey
   }
 
   // @dev: Encrypt the Message with Public Key
-  const encryptMessage = async (publicKey, message) => {
-    console.log(publicKey)
+  const encryptMessage = async () => {
+    console.log(encrypted)
     const encryptedMessage = bufferToHex(
       Buffer.from(
         JSON.stringify(
           encrypt(
             {
-              publicKey: publicKey,
+              publicKey: encrypted,
               data: 'Hello world!',
               version: 'x25519-xsalsa20-poly1305'
             }
@@ -97,6 +109,8 @@ export default function Home() {
       )
     );
 
+    setMessage(encryptedMessage)
+
     return encryptedMessage
   }
 
@@ -104,27 +118,40 @@ export default function Home() {
   const decryptMessage = async (encryptedMessage) => {
     let decryptedMessage = await ethereum.request({
         method: 'eth_decrypt',
-        params: [encryptedMessage, account],
+        params: [message, account],
     })
-
+    console.log(decryptedMessage)
     return decryptedMessage
   }
 
   // @dev: Fetch Data from Graph Protocol
-  const fetchData = () => {
+  const fetchData = async () => {
+    connectContract()
 
+    // let message = await contract.sendMessage('0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266', '0x70997970c51812dc3a010c7d01b50e0d17dc79c8', '43gy5v43kjh5v34u5v435ci43t5cjvhj657b567jhb', 0, new Date().toISOString())
+    // message = await contract.sendMessage('0x70997970c51812dc3a010c7d01b50e0d17dc79c8', '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266', '43gy5v43kjh5v34u5v435ci43t5cjvhj657b567jhb', 0, new Date().toISOString())
+    // message = await message.wait()
+
+    let messages = await contract.allMails(0)
+
+    console.log(messages)
   }
 
   // @dev: Send Message to Contract
   const sendMessage = () => {
-
+    connectContract()
   }
+
+  useEffect(() => {
+    fetchData()
+  }, [])
   
   return (
     <div>
       <button onClick={() => login()}>Connect Metamask</button>
-      <button onClick={() => signn()}>Sign</button>
-      <button onClick={() => decryptt()}>Decrypt</button>
+      <button onClick={() => signTransaction()}>Sign</button>
+      <button onClick={() => encryptMessage()}>Encrypt</button>
+      <button onClick={() => decryptMessage()}>Decrypt</button>
     </div>
   )
 }
